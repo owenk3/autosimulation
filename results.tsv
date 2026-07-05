@@ -1,0 +1,16 @@
+commit	val_success_rate	status	description
+c0cc1b7	0.466667	keep	baseline: action vector correction with explore/exploit (random 15 ep)
+4a8b127	0.200000	keep	baseline for fixed 15 episodes (seed=42): tag parsing fixed, 3/15
+408d557	0.200000	discard	timing info + learnings: same 3/15, bowl task faster (4→2 attempts)
+5d6cb3b	0.266667	keep	16 frames + learnings: 4/15, new success on stacking task
+e0792c1	0.266667	keep	type-specific strategies: 4/15, new frying pan success (lost stacking)
+9d7a2be	0.200000	discard	earlier exploit (3) + flat envelope: regressed 3/15, lost bowl-on-plate
+9f59fa5	0.266667	keep	conservative magnitudes: 4/15, frying pan + bowl-on-plate both back
+c87f553	0.200000	discard	mode=override: regressed 3/15, lost frying pan success
+f96495f	0.333333	keep	curated learnings (proven only): 5/15 NEW BEST, +chocolate pudding
+936ed06	0.133333	discard	wider time windows: worst result 2/15, zero correction successes
+a5459d9	0.200000	discard	3 corrections + arc geometry + 300s timeout: regressed 3/15
+179e3b6	0.200000	discard	explore=2 exploit=8: too little exploration, regressed 3/15
+d017073	0.200000	keep	variance check: same config as iter11 but 3/15 (high VLM variance)
+691c90a	0.200000	discard	phase-aware prompts: regressed to 3/15, lost stacking success
+cb70bcc	0.300000	keep	visual self-calibration 50ep: 15/50 (12 vanilla + 3 correction), 2 new task types

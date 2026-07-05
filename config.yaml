@@ -1,0 +1,12 @@
+server:
+  host: "127.0.0.1"
+  port: 9500
+
+model_family: "pi05"
+n_action_steps: 10
+task_suite: "libero_90"
+env_img_res: 256
+num_steps_wait: 10
+seed: 7
+max_attempts: 5
+openai_model: "gpt-4o"

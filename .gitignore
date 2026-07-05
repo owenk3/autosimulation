@@ -1,0 +1,9 @@
+rollouts/
+corrections/
+LIBERO/
+__pycache__/
+*.pyc
+.env
+legacy/
+experiment_results/
+.DS_Store

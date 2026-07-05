@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autosimulation — Sample Rollouts</title>
+<style>
+  :root {
+    --bg:        #0d0f0e;
+    --surface:   #141816;
+    --panel:     #1a1f1c;
+    --border:    #252e28;
+    --accent:    #3ddc84;
+    --accent-dim:#1a4f32;
+    --fail:      #e05252;
+    --fail-dim:  #4a1a1a;
+    --warn:      #e8b56a;
+    --muted:     #4a5e52;
+    --text:      #d4ddd6;
+    --text-dim:  #7a9082;
+    --mono: 'Cascadia Code','Fira Mono','Consolas',monospace;
+    --sans: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .site-header {
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 2rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.6rem;
+  }
+  h1 {
+    font-size: clamp(1.5rem, 3vw, 2.2rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    color: var(--text);
+    text-wrap: balance;
+  }
+  .header-meta {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    max-width: 62ch;
+    line-height: 1.6;
+  }
+  .stat-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 2rem;
+    margin-top: 1.25rem;
+  }
+  .stat {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .stat-val { color: var(--accent); font-weight: 600; }
+
+  /* ── Nav dots ── */
+  .sample-nav {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .nav-pill {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    padding: 0.3rem 0.75rem;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text-dim);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .nav-pill:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-pill.success { border-color: var(--accent-dim); color: var(--accent); }
+  .nav-pill.failure { border-color: var(--fail-dim); color: var(--fail); }
+
+  /* ── Sample section ── */
+  .sample-section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem 3rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .sample-section:last-child { border-bottom: none; }
+
+  .section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .section-left { flex: 1; min-width: 0; }
+  .section-eyebrow {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 0.35rem;
+  }
+  .section-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text);
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .section-desc {
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    max-width: 55ch;
+  }
+  .outcome-badge {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    padding: 0.25rem 0.65rem;
+    border-radius: 2px;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 0.15rem;
+  }
+  .outcome-badge.success {
+    background: rgba(61,220,132,0.1);
+    border: 1px solid var(--accent-dim);
+    color: var(--accent);
+  }
+  .outcome-badge.failure {
+    background: rgba(224,82,82,0.1);
+    border: 1px solid var(--fail-dim);
+    color: var(--fail);
+  }
+
+  /* ── Attempt strip ── */
+  .attempt-strip {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    padding-bottom: 0.75rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .attempt-strip::-webkit-scrollbar { height: 4px; }
+  .attempt-strip::-webkit-scrollbar-track { background: var(--surface); }
+  .attempt-strip::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .attempt-card {
+    flex-shrink: 0;
+    width: 200px;
+    scroll-snap-align: start;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.15s;
+  }
+  .attempt-card:hover { border-color: var(--muted); }
+  .attempt-card.is-success { border-color: var(--accent-dim); }
+  .attempt-card.is-success:hover { border-color: var(--accent); }
+
+  .attempt-card video {
+    width: 100%;
+    aspect-ratio: 1;
+    display: block;
+    background: #000;
+    cursor: pointer;
+  }
+
+  .attempt-meta {
+    padding: 0.5rem 0.6rem 0.55rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+  .attempt-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .attempt-label .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot-fail    { background: var(--fail); }
+  .dot-success { background: var(--accent); }
+  .dot-vanilla { background: var(--warn); }
+
+  .attempt-phase {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Convergence bar ── */
+  .convergence-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-bottom: 1rem;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+  .conv-step {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .conv-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .conv-dot.fail    { background: rgba(224,82,82,0.4); border-color: var(--fail-dim); }
+  .conv-dot.success { background: var(--accent); border-color: var(--accent); }
+  .conv-dot.vanilla { background: rgba(232,181,106,0.4); border-color: #5a4010; }
+  .conv-arrow { color: var(--border); }
+
+  /* ── Footer ── */
+  .site-footer {
+    border-top: 1px solid var(--border);
+    padding: 1.5rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .footer-text {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+  .footer-link {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .footer-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="eyebrow">autosimulation / sample rollouts</div>
+  <h1>VLM Correction Loop — Visual Results</h1>
+  <p class="header-meta">
+    Each sample shows one episode across all correction attempts. Attempt 1 is the vanilla VLA policy with no correction. Subsequent attempts apply VLM-generated action-bias corrections that evolve based on failure analysis. The robot learns to succeed without any weight updates — only prompt-level in-context correction.
+  </p>
+  <div class="stat-row">
+    <div class="stat">Baseline <span class="stat-val">36.0%</span> success</div>
+    <div class="stat">Up to <span class="stat-val">10</span> attempts per episode</div>
+    <div class="stat">Explore attempts <span class="stat-val">1–6</span> · Exploit <span class="stat-val">7–10</span></div>
+    <div class="stat">Task suite <span class="stat-val">LIBERO-90</span></div>
+  </div>
+</header>
+
+<nav class="sample-nav">
+  <a class="nav-pill success" href="#s1">Bowl on cabinet — run 1</a>
+  <a class="nav-pill success" href="#s2">Bowl on cabinet — run 2</a>
+  <a class="nav-pill success" href="#s3">Bowl on cabinet — run 3</a>
+  <a class="nav-pill failure" href="#s4">Bowl stacking — failure case</a>
+</nav>
+
+<!-- ── SAMPLE 1 ── -->
+<section class="sample-section" id="s1">
+  <div class="section-header">
+    <div class="section-left">
+      <div class="section-eyebrow">Sample 1 · ep1585 · 2026-04-04</div>
+      <div class="section-title">Put the black bowl on top of the cabinet</div>
+      <div class="section-desc">First run. Vanilla policy fails — bowl misses the cabinet top. VLM proposes progressive Z and X corrections over 8 attempts before succeeding.</div>
+    </div>
+    <div class="outcome-badge success">SUCCESS · attempt 8</div>
+  </div>
+
+  <div class="convergence-bar">
+    <div class="conv-step"><div class="conv-dot vanilla"></div><span>a1 vanilla</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a2</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a3</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a4</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a5</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a6</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a7</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot success"></div><span>a8 ✓</span></div>
+  </div>
+
+  <div class="attempt-strip">
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260404_145719/2026_04_04-14_57_19--pi05_a1--episode=1585--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-vanilla"></div>Attempt 1 — vanilla</div>
+        <div class="attempt-phase">no correction</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260404_145719/2026_04_04-14_57_19--pi05_unified_a2--episode=1585--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 2</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260404_145719/2026_04_04-14_57_19--pi05_unified_a3--episode=1585--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 3</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260404_145719/2026_04_04-14_57_19--pi05_unified_a4--episode=1585--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 4</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260404_145719/2026_04_04-14_57_19--pi05_unified_a5--episode=1585--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 5</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260404_145719/2026_04_04-14_57_19--pi05_unified_a6--episode=1585--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 6</div>
+        <div class="attempt-phase">explore → exploit</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260404_145719/2026_04_04-14_57_19--pi05_unified_a7--episode=1585--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 7</div>
+        <div class="attempt-phase">exploit</div>
+      </div>
+    </div>
+    <div class="attempt-card is-success">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260404_145719/2026_04_04-14_57_19--pi05_unified_a8--episode=1585--success=True--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-success"></div>Attempt 8 — SUCCESS</div>
+        <div class="attempt-phase">exploit</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SAMPLE 2 ── -->
+<section class="sample-section" id="s2">
+  <div class="section-header">
+    <div class="section-left">
+      <div class="section-eyebrow">Sample 2 · ep1576 · 2026-04-07</div>
+      <div class="section-title">Put the black bowl on top of the cabinet</div>
+      <div class="section-desc">Second run on the same task type, different episode. Corrections from prior runs inform the strategy. Converges 2 attempts faster than run 1.</div>
+    </div>
+    <div class="outcome-badge success">SUCCESS · attempt 6</div>
+  </div>
+
+  <div class="convergence-bar">
+    <div class="conv-step"><div class="conv-dot vanilla"></div><span>a1 vanilla</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a2</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a3</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a4</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a5</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot success"></div><span>a6 ✓</span></div>
+  </div>
+
+  <div class="attempt-strip">
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260407_040404/2026_04_07-04_04_04--pi05_a1--episode=1576--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-vanilla"></div>Attempt 1 — vanilla</div>
+        <div class="attempt-phase">no correction</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260407_040404/2026_04_07-04_04_04--pi05_unified_a2--episode=1576--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 2</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260407_040404/2026_04_07-04_04_04--pi05_unified_a3--episode=1576--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 3</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260407_040404/2026_04_07-04_04_04--pi05_unified_a4--episode=1576--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 4</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260407_040404/2026_04_07-04_04_04--pi05_unified_a5--episode=1576--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 5</div>
+        <div class="attempt-phase">explore → exploit</div>
+      </div>
+    </div>
+    <div class="attempt-card is-success">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260407_040404/2026_04_07-04_04_04--pi05_unified_a6--episode=1576--success=True--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-success"></div>Attempt 6 — SUCCESS</div>
+        <div class="attempt-phase">exploit</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SAMPLE 3 ── -->
+<section class="sample-section" id="s3">
+  <div class="section-header">
+    <div class="section-left">
+      <div class="section-eyebrow">Sample 3 · ep1576 · 2026-04-15</div>
+      <div class="section-title">Put the black bowl on top of the cabinet</div>
+      <div class="section-desc">Third run. Cross-episode memory transfers proven correction patterns. Succeeds in 5 attempts — 3 fewer than run 1, showing compounding improvement across iterations.</div>
+    </div>
+    <div class="outcome-badge success">SUCCESS · attempt 5</div>
+  </div>
+
+  <div class="convergence-bar">
+    <div class="conv-step"><div class="conv-dot vanilla"></div><span>a1 vanilla</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a2</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a3</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a4</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot success"></div><span>a5 ✓</span></div>
+  </div>
+
+  <div class="attempt-strip">
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260415_002747/2026_04_15-00_27_46--pi05_a1--episode=1576--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-vanilla"></div>Attempt 1 — vanilla</div>
+        <div class="attempt-phase">no correction</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260415_002747/2026_04_15-00_27_46--pi05_unified_a2--episode=1576--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 2</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260415_002747/2026_04_15-00_27_46--pi05_unified_a3--episode=1576--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 3</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260415_002747/2026_04_15-00_27_46--pi05_unified_a4--episode=1576--success=False--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 4</div>
+        <div class="attempt-phase">explore → exploit</div>
+      </div>
+    </div>
+    <div class="attempt-card is-success">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260415_002747/2026_04_15-00_27_46--pi05_unified_a5--episode=1576--success=True--task=put_the_black_bowl_on_top_of_the_cabinet.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-success"></div>Attempt 5 — SUCCESS</div>
+        <div class="attempt-phase">exploit</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SAMPLE 4 ── -->
+<section class="sample-section" id="s4">
+  <div class="section-header">
+    <div class="section-left">
+      <div class="section-eyebrow">Sample 4 · ep840 · 2026-04-16 · failure case</div>
+      <div class="section-title">Stack the black bowl at the front on the black bowl in the middle</div>
+      <div class="section-desc">An honest hard case — all 10 attempts fail. Stacking requires precise contact geometry that the current correction system has not yet solved. The attempts show diverse strategies being explored without convergence.</div>
+    </div>
+    <div class="outcome-badge failure">FAILURE · 10 attempts</div>
+  </div>
+
+  <div class="convergence-bar">
+    <div class="conv-step"><div class="conv-dot vanilla"></div><span>a1</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a2</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a3</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a4</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a5</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a6</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a7</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a8</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a9</span></div>
+    <span class="conv-arrow">→</span>
+    <div class="conv-step"><div class="conv-dot fail"></div><span>a10</span></div>
+  </div>
+
+  <div class="attempt-strip">
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260416_051438/2026_04_16-05_14_37--pi05_a1--episode=840--success=False--task=stack_the_black_bowl_at_the_front_on_the_black_bow.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-vanilla"></div>Attempt 1 — vanilla</div>
+        <div class="attempt-phase">no correction</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260416_051438/2026_04_16-05_14_37--pi05_unified_a2--episode=840--success=False--task=stack_the_black_bowl_at_the_front_on_the_black_bow.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 2</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260416_051438/2026_04_16-05_14_37--pi05_unified_a3--episode=840--success=False--task=stack_the_black_bowl_at_the_front_on_the_black_bow.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 3</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260416_051438/2026_04_16-05_14_37--pi05_unified_a4--episode=840--success=False--task=stack_the_black_bowl_at_the_front_on_the_black_bow.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 4</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260416_051438/2026_04_16-05_14_37--pi05_unified_a5--episode=840--success=False--task=stack_the_black_bowl_at_the_front_on_the_black_bow.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 5</div>
+        <div class="attempt-phase">explore</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260416_051438/2026_04_16-05_14_37--pi05_unified_a6--episode=840--success=False--task=stack_the_black_bowl_at_the_front_on_the_black_bow.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 6</div>
+        <div class="attempt-phase">explore → exploit</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260416_051438/2026_04_16-05_14_37--pi05_unified_a7--episode=840--success=False--task=stack_the_black_bowl_at_the_front_on_the_black_bow.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 7</div>
+        <div class="attempt-phase">exploit</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260416_051438/2026_04_16-05_14_37--pi05_unified_a8--episode=840--success=False--task=stack_the_black_bowl_at_the_front_on_the_black_bow.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 8</div>
+        <div class="attempt-phase">exploit</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260416_051438/2026_04_16-05_14_37--pi05_unified_a9--episode=840--success=False--task=stack_the_black_bowl_at_the_front_on_the_black_bow.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 9</div>
+        <div class="attempt-phase">exploit</div>
+      </div>
+    </div>
+    <div class="attempt-card">
+      <video src="https://github.com/owenk3/autosimulation/raw/main/assets/samples/20260416_051438/2026_04_16-05_14_37--pi05_unified_a10--episode=840--success=False--task=stack_the_black_bowl_at_the_front_on_the_black_bow.mp4" loop muted playsinline preload="metadata"></video>
+      <div class="attempt-meta">
+        <div class="attempt-label"><div class="dot dot-fail"></div>Attempt 10</div>
+        <div class="attempt-phase">exploit</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="footer-text">autosimulation · LIBERO-90 · Pi 0.5 VLA</div>
+  <a class="footer-link" href="https://github.com/owenk3/autosimulation">github.com/owenk3/autosimulation</a>
+</footer>
+
+<script>
+  // Click to play/pause individual videos
+  document.querySelectorAll('.attempt-card video').forEach(v => {
+    v.addEventListener('click', () => v.paused ? v.play() : v.pause());
+  });
+
+  // Intersection observer: autoplay when card scrolls into view, pause when out
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const v = e.target.querySelector('video');
+      if (!v) return;
+      if (e.isIntersecting) v.play().catch(() => {});
+      else { v.pause(); v.currentTime = 0; }
+    });
+  }, { threshold: 0.5 });
+
+  document.querySelectorAll('.attempt-card').forEach(c => observer.observe(c));
+</script>
+</body>
+</html>
