@@ -84,16 +84,22 @@ class LiberoEnv(SimEnv):
         return self._max_steps
 
 
+def _get_suite(suite_name: str):
+    from libero.libero import benchmark
+    return benchmark.get_benchmark_dict()[suite_name]()
+
+
+def suite_n_tasks(suite_name: str) -> int:
+    return _get_suite(suite_name).n_tasks
+
+
 def load_task(suite_name: str, episode: int, num_trials_per_task: int = 50):
     """Return (task, initial_state, task_id) for a global episode index (1-indexed)."""
-    from libero.libero import benchmark
-
     idx = episode - 1
     task_id = idx // num_trials_per_task
     episode_idx = idx % num_trials_per_task
 
-    benchmark_dict = benchmark.get_benchmark_dict()
-    task_suite = benchmark_dict[suite_name]()
+    task_suite = _get_suite(suite_name)
     task = task_suite.get_task(task_id)
     initial_state = task_suite.get_task_init_states(task_id)[episode_idx]
     return task, initial_state, task_id

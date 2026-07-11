@@ -5,8 +5,6 @@ Two modes:
   - vlm:  asks Claude to score 0-100 (slower, more accurate)
 """
 
-from typing import Optional
-
 import cv2
 import numpy as np
 

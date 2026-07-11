@@ -11,7 +11,6 @@ Usage:
 
 import argparse
 import json
-import math
 import os
 import random
 import sys
@@ -33,7 +32,7 @@ _torch_load_orig = torch.load
 torch.load = lambda f, *a, **kw: _torch_load_orig(f, *a, **{**kw, "weights_only": kw.get("weights_only", False)})
 
 from model.vla import get_action, health
-from sim.libero import LiberoEnv, load_task
+from sim.libero import LiberoEnv, load_task, suite_n_tasks
 
 DATE = time.strftime("%Y_%m_%d")
 DATE_TIME = time.strftime("%Y_%m_%d-%H_%M_%S")
@@ -180,7 +179,7 @@ def run_episode(host, port, env: LiberoEnv, task_description, initial_state,
 
 
 def run_episode_unified(host, port, env, task_description, initial_state,
-                        suite_name, episode, seed, num_steps_wait,
+                        episode, seed, num_steps_wait,
                         max_attempts, video_dir, corrector):
     from agentscripts.train import apply_correction
 
@@ -254,14 +253,10 @@ def main():
         corrector = UnifiedCorrector(memory_dir="./corrections/memory")
         print(f"[unified] memory stats: {corrector.stats()}")
 
-    from libero.libero import benchmark
-    benchmark_dict = benchmark.get_benchmark_dict()
-    task_suite_obj = benchmark_dict[args.task_suite]()
-    n_tasks = task_suite_obj.n_tasks
     run_ts = time.strftime("%Y%m%d_%H%M%S")
 
     episodes = [args.episode] if args.episode > 0 else list(
-        range(1, n_tasks * args.num_trials_per_task + 1))
+        range(1, suite_n_tasks(args.task_suite) * args.num_trials_per_task + 1))
 
     results, total, successes = [], 0, 0
 
@@ -286,7 +281,7 @@ def main():
         else:
             success, _ = run_episode_unified(
                 host, port, env, env.task_description, initial_state,
-                args.task_suite, episode, seed, num_steps_wait,
+                episode, seed, num_steps_wait,
                 args.max_attempts, video_dir, corrector)
 
         record = {"eval": args.eval, "episode": episode,
