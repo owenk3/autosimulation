@@ -1,6 +1,26 @@
 # Autosimulation 
 This is an experiment to have VLM-VLA do its own research in simulation setup.
 
+## Branch Rules
+
+Three branch types, each with a different purpose:
+
+| Branch | Purpose | Commit style |
+|--------|---------|--------------|
+| `main` | Stable, clean history | Point-by-point only — never commit directly |
+| `dev` | Code fixes, refactors, infra changes | Free commits, push anytime |
+| `autosimulation/<tag>` | Agent research runs | One commit per experiment iteration |
+
+**Merging dev → main:**
+Never push directly to main. When dev is ready to merge:
+1. Review all commits on dev since last merge (`git log main..dev --oneline`)
+2. Group commits into meaningful clusters (e.g. "modularize sim adapter", "fix vlm imports")
+3. Squash each cluster into one clean commit on main
+4. Each main commit should be self-contained and describe *why*, not just *what*
+
+**Agent research branches:**
+Agent commits go to `autosimulation/<tag>` only. These never merge to main or dev — they are experiment logs, not code changes.
+
 ## Setup
 
 To set up a new experiment, work with the user to:
